@@ -7,6 +7,23 @@ object Dependencies {
       object scrimage {
         val version = "2.1.8"
       }
+      object cats {
+        val version = "0.9.0"
+      }
+      object circe {
+        val version = "0.8.0"
+      }
+    }
+
+
+
+    object circe {
+      import versions.circe.version
+      private val core = "io.circe" %% "circe-core" % version
+      private val generic = "io.circe" %% "circe-generic" % version
+      private val parser = "io.circe" %% "circe-parser" % version
+      private val java8 = "io.circe" %% "circe-java8" % version
+      val all = Seq(core, generic, parser, java8)
     }
     object scrimage {
       import versions.scrimage.version
@@ -16,10 +33,18 @@ object Dependencies {
       val all = Seq(core, extras, filters)
     }
 
+    object cats {
+      import versions.cats.version
+      private val core = "org.typelevel" %% "cats-core" % version
+      private val macros = "org.typelevel" %% "cats-macros" % version
+      private val kernel = "org.typelevel" %% "cats-kernel" % version
+      val required = Seq(core, macros, kernel)
+    }
+
     object test {
       val scalatest = "org.scalatest" %% "scalatest" % "3.0.5" % Test
     }
   }
 
-  lazy val scrimageDependencies = libs.scrimage.all ++ Seq(libs.test.scalatest)
+  lazy val imageProcessor = libs.circe.all ++ Seq(libs.test.scalatest)
 }

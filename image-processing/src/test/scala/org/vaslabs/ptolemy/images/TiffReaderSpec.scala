@@ -9,7 +9,9 @@ class TiffReaderSpec extends WordSpec with Matchers {
     "read the tiff header" in {
       val tiffImage =
         TiffReader.readFromFile("/home/vnicolaou/Downloads/heic1502a.tif")
-      tiffImage shouldBe (Right(TiffImage(TiffHeader(LittleIndian, TiffOffset(1816554936)))))
+      tiffImage should matchPattern {
+        case (Right(TiffImage(TiffHeader(LittleIndian, TiffOffset(1816554936)), list))) if list.size == 24 =>
+      }
     }
   }
 
