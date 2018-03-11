@@ -21,6 +21,9 @@ class TiffReaderSpec extends WordSpec with Matchers {
       resultImage.description shouldBe "This image, captured with the NASA/ESA Hubble Space Telescope, is the largest and sharpest image ever taken of the Andromeda galaxy — otherwise known as M31. This is a cropped version of the full image and has 1.5 billion pixels. You would need more than 600 HD television screens to display the whole image. It is the biggest Hubble image ever released and shows over 100 million stars and thousands of star clusters embedded in a section of the galaxy’s pancake-shaped disc stretching across over 40 000 light-years. This image is too large to be easily displayed at full resolution and is best appreciated using the zoom tool."
       import model.colorModes.syntax._
       resultImage.intepret shouldBe Some(model.colorModes.RGB)
+      import TiffImplicits.imageCalc.syntax._
+      resultImage.stripsPerImage() shouldBe Some(6394)
+
     }
   }
 

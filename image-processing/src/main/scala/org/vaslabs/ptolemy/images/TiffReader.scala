@@ -3,7 +3,6 @@ package org.vaslabs.ptolemy.images
 import java.io._
 import java.nio.ByteBuffer
 
-import com.sun.media.sound.ModelByteBuffer
 import model.errors._
 import model.image._
 

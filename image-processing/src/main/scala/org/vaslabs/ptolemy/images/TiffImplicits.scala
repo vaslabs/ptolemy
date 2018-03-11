@@ -74,4 +74,17 @@ object TiffImplicits {
 
   }
 
+  object imageCalc {
+    object syntax {
+      implicit final class InfoExtractor(val tiffImage: TiffImage) extends AnyVal {
+        def stripsPerImage(): Option[Int] = {
+          for {
+            imageLength <- tiffImage.imageFileDirectories.find(_.fieldTag == ImageLength).map(_.valueOffset.value.toDouble)
+            rowsPerStrip <- tiffImage.imageFileDirectories.find(_.fieldTag == RowsPerStrip).map(_.valueOffset.value.toDouble)
+          } yield Math.floor((imageLength + rowsPerStrip - 1)/rowsPerStrip).toInt
+        }
+      }
+    }
+  }
+
 }
