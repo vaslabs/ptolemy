@@ -5,6 +5,7 @@ import model.fieldTypes._
 import model.errors._
 import model.tags._
 import model.image._
+import org.vaslabs.ptolemy.images.model.planarConfiguration.{Chunky, Configuration, Planar}
 object TiffImplicits {
 
   private object FieldTypeOrder {
@@ -82,6 +83,32 @@ object TiffImplicits {
             imageLength <- tiffImage.imageFileDirectories.find(_.fieldTag == ImageLength).map(_.valueOffset.value.toDouble)
             rowsPerStrip <- tiffImage.imageFileDirectories.find(_.fieldTag == RowsPerStrip).map(_.valueOffset.value.toDouble)
           } yield Math.floor((imageLength + rowsPerStrip - 1)/rowsPerStrip).toInt
+        }
+
+        def samplesPerPixel(): Option[Int] = {
+          tiffImage.imageFileDirectories.find(_.fieldTag == SamplesPerPixel)
+              .map(_.valueOffset.value)
+        }
+
+        private def stripByteCounts(configuration: Configuration): Option[Int] = {
+          stripsPerImage().flatMap {
+            spi =>
+              configuration match {
+                case Chunky =>
+                  Some(spi)
+                case Planar =>
+                  samplesPerPixel().map(_ * spi)
+              }
+          }
+        }
+
+        def byteOffsetOfStrip(): Option[Int] = {
+          import model.planarConfiguration.syntax._
+          for {
+            stripOffsets <- tiffImage.imageFileDirectories.find(_.fieldTag == StripOffsets)
+            planarConfiguration <- tiffImage.planarType()
+            stripByteCounts <- stripByteCounts(planarConfiguration)
+          } yield(stripByteCounts)
         }
       }
     }

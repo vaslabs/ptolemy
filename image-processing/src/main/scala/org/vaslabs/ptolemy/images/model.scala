@@ -188,6 +188,7 @@ object model {
             new String(byteArray, Charset.forName("UTF-8"))
         }
       }
+
     }
     case class Dimensions(width: Int, length: Int)
 
@@ -219,6 +220,33 @@ object model {
 
   }
 
+  object planarConfiguration {
+
+    sealed trait Configuration
+
+    case object Chunky extends Configuration
+
+    case object Planar extends Configuration
+
+    object syntax {
+
+      implicit final class PlanarTranslator(val image: TiffImage) extends AnyVal {
+        def planarType(): Option[Configuration] = {
+          val configValue: Option[Int] = for {
+            planarConfiguration <- image.imageFileDirectories.find(_.fieldTag == PlanarConfiguration)
+          } yield (planarConfiguration.valueOffset.value)
+          configValue.flatMap {
+            case 1 => Some(Chunky)
+            case 2 => Some(Planar)
+            case other => None
+          }
+        }
+      }
+
+    }
+
+  }
+
   object colorModes {
     sealed trait PhotometricIntepretationMode
 
@@ -244,6 +272,35 @@ object model {
               .flatMap(fd => intepret(fd))
       }
     }
+  }
+
+  object tiffDataReader {
+
+    class Strip protected (
+        image: TiffImage) {
+
+
+
+      lazy val data: Iterable[Strip] =
+        new StripIterable(image)
+    }
+
+    class StripIterable(
+          tiffImage: TiffImage)
+        extends Iterable[Strip]{
+
+      import TiffImplicits.imageCalc.syntax._
+      val stripOffsets = tiffImage.imageFileDirectories.find(_.fieldTag == StripOffsets)
+      val stripsPerImage = tiffImage.stripsPerImage()
+
+      override def iterator: Iterator[Strip] = new Iterator[Strip] {
+
+        override def hasNext: Boolean = ???
+
+        override def next(): Strip = ???
+      }
+    }
+
   }
 
 }

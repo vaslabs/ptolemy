@@ -24,6 +24,7 @@ class TiffReaderSpec extends WordSpec with Matchers {
       import TiffImplicits.imageCalc.syntax._
       resultImage.stripsPerImage() shouldBe Some(6394)
 
+      resultImage.byteOffsetOfStrip() shouldBe Some(6394)
     }
   }
 
