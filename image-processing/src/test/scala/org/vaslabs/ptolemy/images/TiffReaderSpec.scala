@@ -25,6 +25,9 @@ class TiffReaderSpec extends WordSpec with Matchers {
       resultImage.stripsPerImage() shouldBe Some(6394)
 
       resultImage.byteOffsetOfStrip() shouldBe Some(6394)
+
+      val strips = resultImage.strips
+      strips.foreach(println)
     }
   }
 

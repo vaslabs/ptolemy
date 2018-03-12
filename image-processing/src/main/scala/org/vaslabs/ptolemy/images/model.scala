@@ -8,20 +8,24 @@ import org.vaslabs.ptolemy.images.model.tags._
 import java.nio.{ByteBuffer, ByteOrder => JByteOrder}
 
 import org.vaslabs.ptolemy.images.model.image.{ImageFileDirectory, TiffImage}
+import org.vaslabs.ptolemy.images.model.tiffDataReader.{BaseStripIterable, Strip}
 
 object model {
 
   object errors {
+
     sealed trait TiffEncodingError
 
     object UnrecognisedByteOrderSignature extends TiffEncodingError
 
     case object FieldTagUnderflow extends TiffEncodingError
+
     case class UnrecognisedFieldTag(value: Int) extends TiffEncodingError
 
     case object FieldTypeUnderflow extends TiffEncodingError
 
     case object IntUnderflow extends TiffEncodingError
+
     case object ShortUnderflow extends TiffEncodingError
 
     case class InvalidFieldType(signature: Short) extends TiffEncodingError
@@ -29,9 +33,11 @@ object model {
     case class NotSignedAsTiff(unexpectedValue: Int) extends TiffEncodingError
 
     case class UnexpectedHeaderSize(size: Int) extends TiffEncodingError
+
   }
 
   object tags {
+
     sealed trait FieldTag {
       val value: Int
     }
@@ -39,57 +45,75 @@ object model {
     case object NewSubfileType extends FieldTag {
       val value = 254
     }
+
     case object ImageWidth extends FieldTag {
       val value = 256
     }
+
     case object ImageLength extends FieldTag {
       val value = 257
     }
+
     case object BitsPerSample extends FieldTag {
       val value = 258
     }
+
     case object Compression extends FieldTag {
       val value = 259
     }
+
     case object ImageDescription extends FieldTag {
       val value = 270
     }
+
     case object PhotometricInterpretation extends FieldTag {
       val value = 262
     }
+
     case object StripOffsets extends FieldTag {
       val value = 273
     }
+
     case object Orientation extends FieldTag {
       val value = 274
     }
+
     case object SamplesPerPixel extends FieldTag {
       val value = 277
     }
+
     case object RowsPerStrip extends FieldTag {
       val value = 278
     }
+
     case object StripByteCounts extends FieldTag {
       val value = 279
     }
+
     case object XResolution extends FieldTag {
       val value = 282
     }
+
     case object YResolution extends FieldTag {
       val value = 283
     }
+
     case object PlanarConfiguration extends FieldTag {
       val value = 284
     }
+
     case object ResolutionUnit extends FieldTag {
       val value = 296
     }
+
     case object Software extends FieldTag {
       val value = 305
     }
+
     case object DateTime extends FieldTag {
       val value = 306
     }
+
     case object Predictor extends FieldTag {
       val value = 317
     }
@@ -128,6 +152,7 @@ object model {
 
 
   object fieldTypes {
+
     sealed trait TiffFieldType
 
     case object TiffByte extends TiffFieldType
@@ -155,13 +180,14 @@ object model {
     case object TiffDouble extends TiffFieldType
 
     case class ValueOffset(val value: Int) extends AnyVal
+
   }
 
   object image {
 
 
     case class TiffImage(header: TiffHeader, imageFileDirectories: Seq[ImageFileDirectory] = Seq.empty,
-               private val fileReader: RandomAccessFile) {
+                         private val fileReader: RandomAccessFile) {
 
       protected lazy val width: Int =
         imageFileDirectories.find(_.fieldTag == ImageWidth).map(_.valueOffset.value).getOrElse(0)
@@ -189,7 +215,10 @@ object model {
         }
       }
 
+      val strips: Strip = new BaseStripIterable(this, fileReader)
+
     }
+
     case class Dimensions(width: Int, length: Int)
 
 
@@ -215,7 +244,6 @@ object model {
     case class ImageFileDirectory(
                                    fieldTag: FieldTag, fieldType: TiffFieldType, numberOfValues: Int, valueOffset: ValueOffset
                                  )
-
 
 
   }
@@ -248,16 +276,20 @@ object model {
   }
 
   object colorModes {
+
     sealed trait PhotometricIntepretationMode
 
     case object WhiteIs0 extends PhotometricIntepretationMode
+
     case object BlackIs0 extends PhotometricIntepretationMode
+
     case object RGB extends PhotometricIntepretationMode
 
     object syntax {
+
       implicit final class IntepretColorMode(val image: TiffImage) extends AnyVal {
         private def intepret(imageFileDirectory: ImageFileDirectory): Option[PhotometricIntepretationMode]
-            = imageFileDirectory match {
+        = imageFileDirectory match {
           case ImageFileDirectory(PhotometricInterpretation, _, _, offset) =>
             offset.value match {
               case 0 => Some(WhiteIs0)
@@ -267,37 +299,118 @@ object model {
             }
           case other => None
         }
+
         def intepret: Option[PhotometricIntepretationMode] =
           image.imageFileDirectories.find(_.fieldTag == PhotometricInterpretation)
-              .flatMap(fd => intepret(fd))
+            .flatMap(fd => intepret(fd))
       }
+
     }
+
   }
 
   object tiffDataReader {
 
-    class Strip protected (
-        image: TiffImage) {
+    trait Strip extends {
+      val offsetValue: Int
+      val byteCount: Int
 
+      def next: Strip
 
+      def hasNext: Boolean
 
-      lazy val data: Iterable[Strip] =
-        new StripIterable(image)
+      def foreach[U](f: Strip => U): Unit = {
+        var strip = this
+        f(strip)
+        while (strip.hasNext) {
+          strip = strip.next
+          f(strip)
+        }
+      }
+
+      override def toString: String =
+        s"strip read from: $offsetValue, with size of $byteCount"
+    }
+
+    class BaseStripIterable(
+        tiffImage: TiffImage, private val randomAccessFile: RandomAccessFile)
+      extends Strip {
+
+      import TiffImplicits.imageCalc.syntax._
+
+      val stripOffsets = tiffImage.imageFileDirectories.find(_.fieldTag == StripOffsets)
+      val stripByteCountsOffset = tiffImage.imageFileDirectories.find(_.fieldTag == StripByteCounts).map(_.valueOffset.value)
+      val remainingBytes = stripOffsets.map(_.numberOfValues).getOrElse(0)
+
+      val offsetValue = 0
+      val offset = stripOffsets.map(_.valueOffset.value).getOrElse(-1)
+
+      override def hasNext: Boolean =
+        offset > 0
+
+      override def next(): Strip = {
+        randomAccessFile.seek(offset)
+        val bytes = Array.ofDim[Byte](4)
+        randomAccessFile.read(bytes, 0, 4)
+        val byteBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
+        val nextStripOffset = byteBuffer.getInt
+
+        val offsetOfStripCount = stripByteCountsOffset.get
+
+        val bytesOfByteCount: Array[Byte] = Array.ofDim[Byte](4)
+        randomAccessFile.seek(offsetOfStripCount)
+
+        randomAccessFile.read(bytesOfByteCount, 0, 4)
+        val byteCountsBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
+        val bytesForStrip = byteCountsBuffer.getInt
+
+        new StripIterable(
+          nextStripOffset,
+          bytesForStrip,
+          tiffImage,
+          randomAccessFile,
+          offset + 4,
+          remainingBytes - 4,
+          offsetOfStripCount + 4
+        )
+      }
+
+      override val byteCount: Int = 0
     }
 
     class StripIterable(
-          tiffImage: TiffImage)
-        extends Iterable[Strip]{
+       val offsetValue: Int,
+       val byteCount: Int,
+       private val tiffImage: TiffImage,
+       private val randomAccessFile: RandomAccessFile,
+       private val nextPosition: Int,
+       private val remaining: Int,
+       private val byteCountOffset: Int
+    ) extends Strip {
 
-      import TiffImplicits.imageCalc.syntax._
-      val stripOffsets = tiffImage.imageFileDirectories.find(_.fieldTag == StripOffsets)
-      val stripsPerImage = tiffImage.stripsPerImage()
 
-      override def iterator: Iterator[Strip] = new Iterator[Strip] {
+      override def hasNext: Boolean = remaining > 0
 
-        override def hasNext: Boolean = ???
-
-        override def next(): Strip = ???
+      override def next(): Strip = {
+        randomAccessFile.seek(nextPosition)
+        val bytes = Array.ofDim[Byte](4)
+        randomAccessFile.read(bytes, 0, 4)
+        val byteBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
+        val nextStripOffset = byteBuffer.getInt
+        randomAccessFile.seek(byteCountOffset)
+        val bytesForStripByteSize = Array.ofDim[Byte](4)
+        randomAccessFile.read(bytesForStripByteSize, 0, 4)
+        val byteSizeBuffer = ByteBuffer.wrap(bytesForStripByteSize).order(tiffImage.header.byteOrder.asJava)
+        val byteCount = byteSizeBuffer.getInt
+        new StripIterable(
+          nextStripOffset,
+          byteCount,
+          tiffImage,
+          randomAccessFile,
+          nextPosition + 4,
+          remaining - 4,
+          byteCountOffset+4
+        )
       }
     }
 
