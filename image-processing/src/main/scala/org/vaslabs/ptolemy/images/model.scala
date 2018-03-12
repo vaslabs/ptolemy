@@ -328,6 +328,14 @@ object model {
         }
       }
 
+      protected def readIntFrom(offset: Int, randomAccessFile: RandomAccessFile, tiffImage: TiffImage): Int = {
+        randomAccessFile.seek(offset)
+        val bytes = Array.ofDim[Byte](4)
+        randomAccessFile.read(bytes, 0, 4)
+        val buffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
+        buffer.getInt()
+      }
+
       override def toString: String =
         s"strip read from: $offsetValue, with size of $byteCount"
     }
@@ -349,20 +357,9 @@ object model {
         offset > 0
 
       override def next(): Strip = {
-        randomAccessFile.seek(offset)
-        val bytes = Array.ofDim[Byte](4)
-        randomAccessFile.read(bytes, 0, 4)
-        val byteBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
-        val nextStripOffset = byteBuffer.getInt
-
+        val nextStripOffset = readIntFrom(offset, randomAccessFile, tiffImage)
         val offsetOfStripCount = stripByteCountsOffset.get
-
-        val bytesOfByteCount: Array[Byte] = Array.ofDim[Byte](4)
-        randomAccessFile.seek(offsetOfStripCount)
-
-        randomAccessFile.read(bytesOfByteCount, 0, 4)
-        val byteCountsBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
-        val bytesForStrip = byteCountsBuffer.getInt
+        val bytesForStrip = readIntFrom(offsetOfStripCount, randomAccessFile, tiffImage)
 
         new StripIterable(
           nextStripOffset,
@@ -374,7 +371,6 @@ object model {
           offsetOfStripCount + 4
         )
       }
-
       override val byteCount: Int = 0
     }
 
@@ -392,16 +388,8 @@ object model {
       override def hasNext: Boolean = remaining > 0
 
       override def next(): Strip = {
-        randomAccessFile.seek(nextPosition)
-        val bytes = Array.ofDim[Byte](4)
-        randomAccessFile.read(bytes, 0, 4)
-        val byteBuffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
-        val nextStripOffset = byteBuffer.getInt
-        randomAccessFile.seek(byteCountOffset)
-        val bytesForStripByteSize = Array.ofDim[Byte](4)
-        randomAccessFile.read(bytesForStripByteSize, 0, 4)
-        val byteSizeBuffer = ByteBuffer.wrap(bytesForStripByteSize).order(tiffImage.header.byteOrder.asJava)
-        val byteCount = byteSizeBuffer.getInt
+        val nextStripOffset = readIntFrom(nextPosition, randomAccessFile, tiffImage)
+        val byteCount = readIntFrom(byteCountOffset, randomAccessFile, tiffImage)
         new StripIterable(
           nextStripOffset,
           byteCount,
