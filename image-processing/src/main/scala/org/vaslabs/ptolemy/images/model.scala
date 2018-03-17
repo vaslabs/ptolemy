@@ -215,6 +215,13 @@ object model {
         }
       }
 
+      def readData(strip: Strip): Array[Byte] = {
+        fileReader.seek(strip.offsetValue)
+        val bytes = Array.ofDim[Byte](strip.byteCount)
+        fileReader.read(bytes)
+        bytes
+      }
+
       val strips: Strip = new BaseStripIterable(this, fileReader)
 
     }
@@ -314,10 +321,23 @@ object model {
     trait Strip extends {
       val offsetValue: Int
       val byteCount: Int
+      val numberOfRows: Option[Int]
 
       def next: Strip
 
       def hasNext: Boolean
+
+      val tiffImage: TiffImage
+
+      val rowsPerStrip: Option[Int] = tiffImage.imageFileDirectories.find(_.fieldTag == RowsPerStrip)
+        .map(_.valueOffset.value)
+
+      val imageLength = tiffImage.imageFileDirectories.find(_.fieldTag == ImageLength).map(_.valueOffset.value)
+
+      val numberOfRowsOnLastLine: Option[Int] = for {
+        rows <- rowsPerStrip
+        length <- imageLength
+      } yield (length % rows)
 
       def foreach[U](f: Strip => U): Unit = {
         var strip = this
@@ -341,7 +361,7 @@ object model {
     }
 
     class BaseStripIterable(
-        tiffImage: TiffImage, private val randomAccessFile: RandomAccessFile)
+        val tiffImage: TiffImage, private val randomAccessFile: RandomAccessFile)
       extends Strip {
 
       import TiffImplicits.imageCalc.syntax._
@@ -349,6 +369,8 @@ object model {
       val stripOffsets = tiffImage.imageFileDirectories.find(_.fieldTag == StripOffsets)
       val stripByteCountsOffset = tiffImage.imageFileDirectories.find(_.fieldTag == StripByteCounts).map(_.valueOffset.value)
       val remainingBytes = stripOffsets.map(_.numberOfValues).getOrElse(0)
+
+      override val numberOfRows: Option[Int] = rowsPerStrip
 
       val offsetValue = 0
       val offset = stripOffsets.map(_.valueOffset.value).getOrElse(-1)
@@ -377,13 +399,14 @@ object model {
     class StripIterable(
        val offsetValue: Int,
        val byteCount: Int,
-       private val tiffImage: TiffImage,
+       val tiffImage: TiffImage,
        private val randomAccessFile: RandomAccessFile,
        private val nextPosition: Int,
        private val remaining: Int,
        private val byteCountOffset: Int
     ) extends Strip {
 
+      override val numberOfRows: Option[Int] = if (hasNext) rowsPerStrip else numberOfRowsOnLastLine
 
       override def hasNext: Boolean = remaining > 0
 

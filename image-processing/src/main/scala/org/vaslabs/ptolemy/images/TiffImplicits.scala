@@ -1,4 +1,5 @@
 package org.vaslabs.ptolemy.images
+import java.io.RandomAccessFile
 import java.nio.ByteBuffer
 
 import model.fieldTypes._
@@ -6,6 +7,8 @@ import model.errors._
 import model.tags._
 import model.image._
 import org.vaslabs.ptolemy.images.model.planarConfiguration.{Chunky, Configuration, Planar}
+import org.vaslabs.ptolemy.images.model.tiffDataReader.Strip
+import org.vaslabs.ptolemy.images.tiff.{ImageFraction, ImageRow, RGB}
 object TiffImplicits {
 
   private object FieldTypeOrder {
@@ -110,7 +113,21 @@ object TiffImplicits {
             stripByteCounts <- stripByteCounts(planarConfiguration)
           } yield(stripByteCounts)
         }
+
+        def imageFraction(strip: Strip): Option[ImageFraction] = {
+          val bytes: Array[Byte] = tiffImage.readData(strip)
+          val buffer = ByteBuffer.wrap(bytes).order(tiffImage.header.byteOrder.asJava)
+          import tiff.syntax._
+          val rgbData: List[RGB] = buffer.getPixels()
+          for {
+            numberOfRows <- strip.numberOfRows
+            pixelsPerRow = rgbData.size / numberOfRows
+            _ = println(s"number of rows: $numberOfRows with pixels per row: $pixelsPerRow")
+          } yield (ImageFraction(rgbData.grouped(pixelsPerRow).map(ImageRow).toList))
+        }
       }
+
+
     }
   }
 

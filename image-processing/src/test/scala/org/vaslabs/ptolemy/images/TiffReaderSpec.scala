@@ -27,7 +27,11 @@ class TiffReaderSpec extends WordSpec with Matchers {
       resultImage.byteOffsetOfStrip() shouldBe Some(6394)
 
       val strips = resultImage.strips
-      strips.foreach(println)
+
+      val firstStrip = strips.next
+
+      resultImage.imageFraction(firstStrip).get.rows(0).pixels.take(100)
+
     }
   }
 
