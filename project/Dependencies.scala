@@ -44,7 +44,18 @@ object Dependencies {
     object test {
       val scalatest = "org.scalatest" %% "scalatest" % "3.0.5" % Test
     }
+
+    object akka {
+      val actor = "com.typesafe.akka" %% "akka-actor" % "2.5.11"
+      val testKit = "com.typesafe.akka" %% "akka-testkit" % "2.5.11" % Test
+      val cluster = "com.typesafe.akka" %% "akka-cluster" % "2.5.11"
+      val sharding = "com.typesafe.akka" %% "akka-cluster-sharding" %  "2.5.11"
+
+      val all = Seq(actor, testKit, cluster, sharding)
+    }
   }
 
   lazy val imageProcessor = libs.circe.all ++ Seq(libs.test.scalatest)
+
+  lazy val store = libs.akka.all :+ libs.test.scalatest
 }

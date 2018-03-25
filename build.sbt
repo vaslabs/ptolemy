@@ -12,7 +12,14 @@ lazy val imageProcessor = project.in(file("image-processing"))
   .settings(
     name := "ptolemy-image-processor",
     libraryDependencies ++= Dependencies.imageProcessor
-  ).enablePlugins(PartialUnification)
+  )
+
+lazy val imageStore = project.in(file("store"))
+    .settings(commonSettings: _*)
+    .settings(
+      name := "ptolemy-image-store",
+      libraryDependencies ++= Dependencies.store
+    ).dependsOn(imageProcessor)
 
 
 lazy val ptolemy = project.in(file("."))
