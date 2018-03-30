@@ -20,12 +20,17 @@ class ImageSpec extends TestKit(ActorSystem("PtolemyTestSystem")) with WordSpecL
     case object Ack
     val storage = TestProbe()
     val imageActor: TestActorRef[Image] = TestActorRef(Image.props(ImageId("img"), storage.ref))
+    val dummyData = TiffData(StripId(1), List.empty)
     "delegate the storage to the actor and forward acknowledgment of storing" in {
-      val dummyData = TiffData(StripId(1), List.empty)
       imageActor ! Image.Protocol.Store(dummyData, Some(Ack))
       storage.expectMsg(Image.Protocol.StoreFraction(ImageId("img"), dummyData, self, Some(Ack)))
       storage.reply(StoredFractionAck(StripId(1), self, Some(Ack)))
       expectMsg(Ack)
+    }
+
+    "delegates the data retrieval to the storage actor and forwards result" in {
+      imageActor ! Image.Protocol.GetData(StripId(1))
+      storage.expectMsg(Image.Protocol.SendDataTo(self))
     }
   }
 }

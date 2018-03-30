@@ -39,16 +39,16 @@ object ImageFraction {
 
   private final val stripsPerShard = 10
 
-//  object Sharding {
-//    val extractShardId: ShardRegion.ExtractShardId = {
-//      case StoreFraction(imageId, data, _, _) =>
-//        s"_${imageId}_${data.strip.value % stripsPerShard}"
-//    }
-//    val extractEntityId: ShardRegion.ExtractEntityId = {
-//      case storeMsg @ StoreFraction(_, data, _, _) =>
-//        (data.strip.toString, storeMsg)
-//    }
-//  }
+  object Sharding {
+    val extractShardId: ShardRegion.ExtractShardId = {
+      case StoreFraction(imageId, data, _, _) =>
+        s"_${imageId}_${data.strip.value % stripsPerShard}"
+    }
+    val extractEntityId: ShardRegion.ExtractEntityId = {
+      case storeMsg @ StoreFraction(_, data, _, _) =>
+        (data.strip.toString, storeMsg)
+    }
+  }
 
 }
 
