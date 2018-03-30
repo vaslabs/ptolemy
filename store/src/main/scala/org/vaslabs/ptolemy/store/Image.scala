@@ -1,8 +1,9 @@
 package org.vaslabs.ptolemy.store
 
-import akka.actor.{Actor, ActorRef}
+import akka.actor.{Actor, ActorRef, Props}
 import akka.cluster.sharding.ShardRegion
 import org.vaslabs.ptolemy.images.tiff.ImageRow
+import org.vaslabs.ptolemy.store.Image.model.ImageId
 
 class Image private(val imageId: Image.model.ImageId, imageFractions: ActorRef) extends Actor{
 
@@ -38,22 +39,24 @@ object ImageFraction {
 
   private final val stripsPerShard = 10
 
-  object Sharding {
-    val extractShardId: ShardRegion.ExtractShardId = {
-      case StoreFraction(imageId, data, _, _) =>
-        s"_${imageId}_${data.strip.value % stripsPerShard}"
-    }
-    val extractEntityId: ShardRegion.ExtractEntityId = {
-      case storeMsg @ StoreFraction(_, data, _, _) =>
-        (data.strip.toString, storeMsg)
-    }
-  }
+//  object Sharding {
+//    val extractShardId: ShardRegion.ExtractShardId = {
+//      case StoreFraction(imageId, data, _, _) =>
+//        s"_${imageId}_${data.strip.value % stripsPerShard}"
+//    }
+//    val extractEntityId: ShardRegion.ExtractEntityId = {
+//      case storeMsg @ StoreFraction(_, data, _, _) =>
+//        (data.strip.toString, storeMsg)
+//    }
+//  }
 
 }
 
 object Image {
+  def props(imageId: ImageId, storage: ActorRef): Props = Props(new Image(imageId, storage))
 
-  private[Image] object model {
+
+  private[store] object model {
     case class ImageId(value: String) extends AnyVal
     case class StripId(value: Int) extends AnyVal
     sealed trait ImageData
@@ -70,9 +73,9 @@ object Image {
     sealed trait ImageDataError
     case object ImageDataNotFound extends ImageDataError
 
-    private[Image] case class StoreFraction(imageId: ImageId, tiffData: TiffData, replyTo: ActorRef, ack: Option[Any])
-    private[Image] case class StoredFractionAck(stripId: StripId, replyTo: ActorRef, msg: Option[Any])
-    private[Image] case class SendDataTo(replyTo: ActorRef)
+    private[store] case class StoreFraction(imageId: ImageId, tiffData: TiffData, replyTo: ActorRef, ack: Option[Any])
+    private[store] case class StoredFractionAck(stripId: StripId, replyTo: ActorRef, msg: Option[Any])
+    private[store] case class SendDataTo(replyTo: ActorRef)
   }
 
 
