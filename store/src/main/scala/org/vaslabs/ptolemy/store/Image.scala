@@ -3,6 +3,7 @@ package org.vaslabs.ptolemy.store
 import akka.actor.{Actor, ActorRef, Props}
 import akka.cluster.sharding.ShardRegion
 import org.vaslabs.ptolemy.images.tiff.ImageRow
+import org.vaslabs.ptolemy.store.Image.Protocol._
 import org.vaslabs.ptolemy.store.Image.model.ImageId
 
 class Image private(val imageId: Image.model.ImageId, imageFractions: ActorRef) extends Actor{
@@ -33,7 +34,25 @@ class Image private(val imageId: Image.model.ImageId, imageFractions: ActorRef) 
   }
 }
 
+class ImageFraction extends Actor {
+  override def receive: Receive = {
+    case StoreFraction(imageId, data, replyTo, ack) =>
+      context.become(receiveWithInitialised(imageId, data))
+      sender() ! StoredFractionAck(data.strip, replyTo, ack)
+    case SendDataTo(replyTo) => replyTo ! ImageDataNotFound
+  }
+
+  private[this] def receiveWithInitialised(imageId: ImageId, data: Image.model.TiffData): Receive = {
+    case SendDataTo(replyTo) => data
+    case StoreFraction(imageId, data, replyTo, ack) =>
+      sender() ! StoredFractionAck(data.strip, replyTo, ack)
+  }
+}
+
+
 object ImageFraction {
+  def props() = Props(new ImageFraction)
+
 
   import Image.Protocol.StoreFraction
 
